@@ -1,4 +1,4 @@
-## Dynamic data masking in Amazon RDS for PostgreSQL, Amazon Aurora PostgreSQL, and Babelfish for Aurora PostgreSQL![image](https://github.com/user-attachments/assets/d3923477-eef2-47c3-81f5-ac40ef426f54)
+## Dynamic data masking in Amazon RDS for PostgreSQL, Amazon Aurora PostgreSQL, and Babelfish for Aurora PostgreSQL
 
 
 TODO: Fill this README out!
