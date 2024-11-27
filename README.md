@@ -18,7 +18,8 @@ One technique to implement DDM is through dynamic masking views. These views ob
 # **DDM Using Masking Views** 
 This post discusses an AWS open source DDM package that accepts a source table as input and generates a view which, based on the persona of the user accessing the view, masks the PII columns in the source table using the masking pattern declared for those columns. The masking view masks the PII columns for the unauthorized users. The authorized users see the data in those columns unmasked.
 
-The following sections discuss the DDM package architecture, its components, and how to use the package. The code for the DDM package can be found in [AWS GitHub](https://github.com/aws-samples/Dynamic-data-masking-in-Amazon-RDS-for-PostgreSQL-Amazon-Aurora-PostgreSQL-and-Babelfish-for-Aurora).
+The following sections discuss the DDM package architecture, its components, and how to use the package. 
+
 ## **DDM package architecture**
 
 The DDM utility has five main components
