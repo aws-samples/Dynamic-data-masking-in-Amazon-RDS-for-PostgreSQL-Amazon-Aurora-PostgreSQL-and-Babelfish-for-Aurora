@@ -1,6 +1,7 @@
-## Dynamic data masking in Amazon RDS for PostgreSQL, Amazon Aurora PostgreSQL, and Babelfish for Aurora PostgreSQL
+# **Dynamic data masking in Amazon RDS for PostgreSQL, Amazon Aurora PostgreSQL, and Babelfish for Aurora PostgreSQL**
 
-Data obfuscation, or data anonymization refers to a collection of techniques used to disguise or alter sensitive data in order to minimizes the risk of data breaches, while still allowing legitimate access for necessary operations. This process is commonly used in industries such as financial, healthcare and government industries where confidentiality of sensitive information is important and is demanded by industry compliance standards and regulations. 
+
+Data obfuscation, or data anonymization refers to a collection of techniques used to disguise or alter sensitive data in order to minimize the risk of data breaches, while still allowing legitimate access for necessary operations. This process is commonly used in industries such as financial, healthcare and government industries where confidentiality of sensitive information is important and is demanded by industry compliance standards and regulations. 
 
 Data obfuscation techniques can vary in the level of privacy protection they offer. These techniques include:
 
@@ -9,30 +10,33 @@ Data obfuscation techniques can vary in the level of privacy protection they off
 - ***Tokenization*** -  [This technique](https://en.wikipedia.org/wiki/Tokenization_\(data_security\)) substitutes sensitive data elements with non-sensitive equivalents, referred to as a token, that have no intrinsic or exploitable meaning or value. The token is a reference that maps back to the sensitive data through a tokenization system.
 - ***Data masking*** – [This technique](https://en.wikipedia.org/wiki/Data_masking) uses masking patterns to partially or completely hide the data by replacing it with fictitious or obscured data.
 
-Although, data masking, arguably provides the most basic level of anonymization, it is a popular technique across organizations. The more popular version of the technique is dynamic data masking where the data is masked in real time and the decision on whether and whom to mask the data for is determined at query time without changing the actual data stored in the database. Many commercial database systems, such as Oracle and Microsoft SQL Server provide dynamic data masking and customers migrating from these database systems to PostgreSQL may require a similar functionality in PostgreSQL. In this post, we discuss a dynamic data masking technique based on dynamic masking views. These views mask personally identifiable information (PII) columns for unauthorized users. This post discusses how to implement this technique in RDS for PostgreSQL and Aurora PostgreSQL-compatible Edition including Babelfish for Aurora PostgreSQL. 
+There are a variety of different techniques available to support data masking in databases, each with their tradeoffs. In this post, we'll explore dynamic data masking, a technique that returns anonymized data from a query without modifying the underlying data
+
+Many commercial database systems, such as Oracle and Microsoft SQL Server provide dynamic data masking and customers migrating from these database systems to PostgreSQL may require a similar functionality in PostgreSQL. In this post, we discuss a dynamic data masking technique based on dynamic masking views. These views mask personally identifiable information (PII) columns for unauthorized users. This post discusses how to implement this technique in RDS for PostgreSQL and Aurora PostgreSQL-compatible Edition including Babelfish for Aurora PostgreSQL. In the last section, we discuss the limitation of dynamic data masking techniques.
 # **Dynamic Data Masking with Masking Views** 
-This post discusses a dynamic data masking package that accepts a source table as input and generates a view which, based on the persona of the user accessing the view, masks the PII columns in the source table using the masking pattern declared for those columns. The masking view masks the PII columns for the unauthorized users. The authorized users see the data in those columns unmasked. The code for the package can be found in [AWS GitHub](https://github.com/aws-samples/Dynamic-data-masking-in-Amazon-RDS-for-PostgreSQL-Amazon-Aurora-PostgreSQL-and-Babelfish-for-Aurora).
+This post discusses a dynamic data masking (PGDDM) package that accepts a source table as input and generates a view which, based on the persona of the user accessing the view, masks the PII columns in the source table using the masking pattern declared for those columns. The masking view masks the PII columns for the unauthorized users. The authorized users see the data in those columns unmasked. The code for PGDDM can be found on [AWS GitHub](https://github.com/aws-samples/Dynamic-data-masking-in-Amazon-RDS-for-PostgreSQL-Amazon-Aurora-PostgreSQL-and-Babelfish-for-Aurora).
 
-To make the dynamic data masking package globally available, in the case of Babelfish, the package is placed in the sys schema in Babelfish\_db on the PostgreSQL endpoint of Babelfish.  To load the dynamic data masking artifacts, sign in to Babelfish using the PostgreSQL endpoint and load the script “[DDM.SQL](https://github.com/aws-samples/Dynamic-data-masking-in-Amazon-RDS-for-PostgreSQL-Amazon-Aurora-PostgreSQL-and-Babelfish-for-Aurora/blob/main/Babelfish/DDM/DDM.sql).” This script loads all the artifacts into the sys schema in this database. The sys schema is global to Babelfish and makes all these artifacts visible to all the databases on a Babelfish instance.
+To make the PGDDM package globally available, in the case of Babelfish, place the package in the sys schema in Babelfish\_db on the PostgreSQL endpoint of Babelfish.  To load the PGDDM artifacts, sign in to Babelfish using the PostgreSQL endpoint and load the script “[PGDDM.SQL](https://github.com/aws-samples/Dynamic-data-masking-in-Amazon-RDS-for-PostgreSQL-Amazon-Aurora-PostgreSQL-and-Babelfish-for-Aurora/blob/d480b3e62e539c4bac58c8d39e557e70c3a2aa28/Babelfish/PGDDM/PGDDM.sql).” This script loads all the artifacts into the sys schema in this database. The sys schema is global to Babelfish and makes all these artifacts visible to all the databases on a Babelfish instance.
 
 
 
-In the case of Aurora and Amazon RDS for PostgreSQL, the dynamic data masking package is placed in the sys schema in a given database and can be loaded using the script “[DDM.SQL](https://github.com/aws-samples/Dynamic-data-masking-in-Amazon-RDS-for-PostgreSQL-Amazon-Aurora-PostgreSQL-and-Babelfish-for-Aurora/blob/main/Postgresql/DDM/DDM.sql)”. In PostrgeSQL, databases are independent and there is no global database accessible from all other databases. One way to make the dynamic data masking package common to all the databases is to use the [template utility](https://www.postgresql.org/docs/current/manage-ag-templatedbs.html) of PostgreSQL. Note, that the template content doesn’t propagate to the existing databases.
-## **Dynamic Data Masking Architecture**
+In the case of Amazon Aurora PostgreSQL-compatible and Amazon RDS for PostgreSQL, place the PGDDM package in the sys schema in a given database. To load the content, use the script “[PGDDM.SQL](https://github.com/aws-samples/Dynamic-data-masking-in-Amazon-RDS-for-PostgreSQL-Amazon-Aurora-PostgreSQL-and-Babelfish-for-Aurora/blob/fd1666e50d6ca1ea8eff76ca6f92f0671c97bcca/Postgresql/PGDDM/PGDDM.sql).” A database in PostgreSQL is independent, so to make the
 
-The dynamic data masking technique discussed in this post has five main components
+PGDDM package common to all the databases, you can use [Template Databases](https://www.postgresql.org/docs/current/manage-ag-templatedbs.html) to automatically install the extension in new databases. Note, that the template content doesn’t propagate to the existing databases.
+## **PGDDM Architecture**
+
+PGDDM has five main components
 
 - Source tables – the tables containing PII columns
-- pii\_masked\_columns table – this table lists all the PII columns in a source table, and the masking pattern to use to mask a specific PII column.
-- unmasked\_roles table – this table specifies the authorized roles who can see the PII columns in a source table unmasked.
+- Pii\_masked\_columns table – this table lists all the PII columns in a source table, and the masking pattern to use to mask a specific PII column.
+- Unmasked\_roles table – this table specifies the authorized roles who can see the PII columns in a source table unmasked.
 - Masking artifacts – a set of functions and procedures used to generate masking views and apply masking patterns.
 - Masking views – the views that mask PII columns for unauthorized users, using the declared masking pattern
 
 
 ` `The following diagram shows the end-to-end process for enforcing dynamic data masking using masking views. 
 
-![image](https://github.com/user-attachments/assets/cb825e28-595d-47f0-8bcc-e8795c881225)
-
+![alt text](image-3.png)
 
 To implement this workflow
 
@@ -44,10 +48,10 @@ To implement this workflow
 
 
 
-Note that the dynamic data masking package presented here assumes that the source table and the masking views are located in separate database schemas. This is because the masking views and the source table have the same name.
-## **Dynamic Data Masking Patterns**
+Note that PGDDM assumes that the source table and the masking views are located in separate database schemas. This is because the masking views and the source table have the same name.
+## **Masking Functions in PGDDM**
 
-The dynamic data masking package allows for the following masking patterns. A masking pattern is a function that masks the data in a PII column based on some regular expression pattern. The following table lists the available masking patterns.
+The PGDDM package allows for the following masking patterns. A masking pattern is a function that masks the data in a PII column based on some regular expression pattern. The following table lists the available masking patterns.
 **
 
 
@@ -55,7 +59,7 @@ The dynamic data masking package allows for the following masking patterns. A ma
 | :- | :- | :- | :- | :- |
 |<br>default()|<br>Text|<br>MASKED WITH (FUNCTION = default())|<br>admin|<br>X|
 |<br>default()|<br>Number|<br>MASKED WITH (FUNCTION = default())|100|0|
-|<br>partial(n, xxxxx, m)|<br>Text|<br>MASKED WITH (FUNCTION = partial(0, xxxxx, 8)|<br>chase|<br>xxxxxxxx|
+|<br>partial(n, xxxxx, m)|<br>Text|<br>MASKED WITH (FUNCTION = partial(0, xxxxx, 8)|<br>admin|<br>xxxxxxxx|
 |<br>email()|<br>Text|<br>MASKED WITH (FUNCTION=email())|<br><john@efgh.biz>|<br>[joXXXXXXXX.net](http://joXXXXXXXX.net)|
 |<br>random(n, 1m)|<br>Number|<br>MASKED WITH (FUNCTION = random(1, 100))|7102933|15|
 
@@ -81,7 +85,7 @@ Examples of the entries in the pii\_masked\_columns table are:
 |<br>Users|<br>source\_schema|<br>user\_bank|<br>account\_id|<br>MASKED WITH (FUNCTION = random(1, 100))|
 |<br>Users|<br>source\_schema|<br>user\_bank|<br>balance|<br>MASKED WITH (FUNCTION = random(100,500))|
 
-` `**Authorized users**
+` `**Setting up authorized users for viewing unmasked data**
 
 
 Authorized users, those who can see the PII data unmasked, are defined using the unmasked\_roles table. The table has the following layout:
@@ -108,15 +112,15 @@ Examples of the entries in the table are:
 |Hr|Users|source\_schema|user\_bank|
 |Hr|Users|source\_schema|user\_location|
 
-## **Dynamic Data masking views**
+## **Building dynamic data masking views**
 
-The masking procedure GenMaskingView  is used to generate the masking view for a specific table. In this post, we provide the syntax for using the procedure in RDS for PostgreSQL and Aurora PostgreSQL-compatible Edition including Babelfish for Aurora PostgreSQL. 
+The masking procedure GenMaskingView  is used to generate the masking view for a specific table. Here, we provide the syntax for using the procedure in RDS for PostgreSQL and Aurora PostgreSQL-compatible Edition including Babelfish for Aurora PostgreSQL. 
 
 
 
 **PostgreSQL:**
 
-call sys.GenMaskingView (<database>, <source\_schema>, <source\_table>, <view\_schema>);
+CALL sys.GenMaskingView (<database>, <source\_schema>, <source\_table>, <view\_schema>);
 
 
 
@@ -124,7 +128,7 @@ call sys.GenMaskingView (<database>, <source\_schema>, <source\_table>, <vi
 
 
 
-call sys.GenMaskingView ( 'users', 'source\_schema',  'users',  'view\_schema')
+CALL sys.GenMaskingView ( 'users', 'source\_schema',  'users',  'view\_schema')
 
 
 
@@ -160,13 +164,13 @@ FROM source\_schema.user\_bank, t
 
 **Babelfish (TSQL endpoint):**
 
-exec sys.GenMaskingView @p\_database = <database>, @p\_source\_schema = <source\_schema>, @p\_source\_table= <source\_table>, @p\_view\_schema = <view\_schema>
+EXEC sys.GenMaskingView @p\_database = <database>, @p\_source\_schema = <source\_schema>, @p\_source\_table= <source\_table>, @p\_view\_schema = <view\_schema>
 
 **Example:**
 
 
 
-exec sys.GenMaskingView @p\_database = 'users', @p\_source\_schema = 'source\_schema', @p\_source\_table= 'users', @p\_view\_schema = 'view\_schema'
+EXEC sys.GenMaskingView @p\_database = 'users', @p\_source\_schema = 'source\_schema', @p\_source\_table= 'users', @p\_view\_schema = 'view\_schema'
 
 
 
@@ -206,18 +210,19 @@ When dealing with many tables, it can become cumbersome to keep track of the tab
 
 **PostgreSQL:**
 
-call sys.MaskingReconciliation  (<database>, <source\_schema>, <view\_schema>);
+CALL sys.MaskingReconciliation  (<database>, <source\_schema>, <view\_schema>);
 
 **Babelfish (TSQL endpoint):**
 
-exec sys.MaskingReconciliation @p\_database = <database>, @p\_source\_schema = <source\_schema>, @p\_view\_schema = <view\_schema> 
-## **Using masking views**
+EXEC sys.MaskingReconciliation @p\_database = <database>, @p\_source\_schema = <source\_schema>, @p\_view\_schema = <view\_schema> 
+##
+## **Querying dynamic masking views**
 
 After users are given permissions to access dynamic data masking views, they can view the data in source table by selecting from these views. An unauthorized user sees the PII columns masked while an authorized sees them unmasked. For example, an unauthorized user sees the following entries in the user\_bank source bank when selecting from user\_bank  view. 
 
 
 
-**select** \* **from**  ***view\_schema.user\_bank***
+**SELECT** \* **FROM**  ***view\_schema.user\_bank***
 
 |bank\_id|user\_id|bank\_name|account\_id|balance|
 | :- | :- | :- | :- | :- |
@@ -244,8 +249,17 @@ An authorized user using the same view will see the PII data unmasked.
 |7|5|bank5|11,111,111|60,000|
 |8|6|Bank\_in\_congress|222,222|3,000|
 |9|7|bank1|887,603|650,000|
-##
-## **Cleanup**
+# **Limitations of Dynamic Data Masking** 
+
+While dynamic data masking can often be simpler to get started with, it has several limitations that you must be aware of. These include
+
+- **Read-only nature:**Dynamically masked data cannot be written back to the database, and it not unsuitable for development and testing environments where data needs to be modified. 
+- **Performance impact:**The real-time masking process can introduce additional processing overhead, potentially impacting query performance.
+- **Complex configuration:**Setting up masking rules with granular access controls or queries that require federation to remote systems can be intricate and require careful management. 
+- **Potential for bypass:**Users with high-level database privileges might be able to access the original unmasked data. 
+- **Inference vulnerabilities:**While masking hides sensitive data, one with access to masked data might still be able to infer sensitive information through pattern analysis.
+
+# **Cleanup**
 If you decide that you no longer need the setup presented in this post, make sure to delete the setup and all the associated resources to avoid being charged in the future. The steps to delete the resources are
 
 - **Sign in to the AWS Management Console and open the Amazon RDS console.**
@@ -253,12 +267,8 @@ If you decide that you no longer need the setup presented in this post, make sur
 - For Actions, choose Delete.
 - Enter delete me in the box.
 - Choose Delete.
-  
-## Security
+# **Conclusion**
 
-See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
+In this post, we showed how you can implement dynamic data masking views in Aurora PostgreSQL-compatible Edition and RDS for PostgreSQL, by generating masking views to mask the PII data for unauthorized users. We also noted that Dynamic data masking is primarily for masking sensitive data on-the-fly in production environments for authorized users with limited access, but not for full data manipulation or development purposes. You can find the source code for the dynamic data masking artifacts on [AWS GitHub](https://github.com/aws-samples/Dynamic-data-masking-in-Amazon-RDS-for-PostgreSQL-Amazon-Aurora-PostgreSQL-and-Babelfish-for-Aurora). 
 
-## License
-
-This library is licensed under the MIT-0 License. See the LICENSE file.
 
