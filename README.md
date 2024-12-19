@@ -254,11 +254,11 @@ An authorized user using the same view will see the PII data unmasked.
 
 While dynamic data masking can often be simpler to get started with, it has several limitations that you must be aware of. These include
 
-- **Read-only nature:**Dynamically masked data cannot be written back to the database, and it not unsuitable for development and testing environments where data needs to be modified. 
-- **Performance impact:**The real-time masking process can introduce additional processing overhead, potentially impacting query performance.
-- **Complex configuration:**Setting up masking rules with granular access controls or queries that require federation to remote systems can be intricate and require careful management. 
-- **Potential for bypass:**Users with high-level database privileges might be able to access the original unmasked data. 
-- **Inference vulnerabilities:**While masking hides sensitive data, one with access to masked data might still be able to infer sensitive information through pattern analysis.
+- **Read-only nature:** Dynamically masked data cannot be written back to the database, and it not unsuitable for development and testing environments where data needs to be modified. 
+- **Performance impact:** The real-time masking process can introduce additional processing overhead, potentially impacting query performance.
+- **Complex configuration:** Setting up masking rules with granular access controls or queries that require federation to remote systems can be intricate and require careful management. 
+- **Potential for bypass:** Users with high-level database privileges might be able to access the original unmasked data. 
+- **Inference vulnerabilities:** While masking hides sensitive data, one with access to masked data might still be able to infer sensitive information through pattern analysis.
 
 # **Cleanup**
 If you decide that you no longer need the setup presented in this post, make sure to delete the setup and all the associated resources to avoid being charged in the future. The steps to delete the resources are
