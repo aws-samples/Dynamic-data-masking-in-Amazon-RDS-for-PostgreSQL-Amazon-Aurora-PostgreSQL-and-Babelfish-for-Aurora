@@ -32,7 +32,8 @@ PGDDM has five main components:
 
 The following diagram shows the end-to-end process for enforcing dynamic data masking using masking views. 
 
-![alt text](image.png) 
+<img width="468" alt="image" src="https://github.com/user-attachments/assets/e0d230b1-cb28-4568-b964-90521f259ec9" />
+ 
 
 To implement this workflow, complete the following steps:
 
