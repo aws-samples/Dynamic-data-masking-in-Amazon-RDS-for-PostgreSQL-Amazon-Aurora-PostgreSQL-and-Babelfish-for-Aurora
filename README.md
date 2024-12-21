@@ -61,7 +61,7 @@ The PGDDM package allows for the following masking patterns. A masking pattern i
 |<br>default()|<br>Text|<br>MASKED WITH (FUNCTION = default())|<br>admin|<br>X|
 |<br>default()|<br>Number|<br>MASKED WITH (FUNCTION = default())|100|0|
 |<br>partial(n, xxxxx, m)|<br>Text|<br>MASKED WITH (FUNCTION = partial(0, xxxxx, 8)|<br>admin|<br>xxxxxxxx|
-|<br>email()|<br>Text|<br>MASKED WITH (FUNCTION=email())|<br><john@efgh.biz>|<br>[joXXXXXXXX.net](http://joXXXXXXXX.net)|
+|<br>email()|<br>Text|<br>MASKED WITH (FUNCTION=email())|<br><john@efgh.biz>|<br>[joXXXXXXXX.net](http://joXXXXXXXX.biz)|
 |<br>random(n, 1m)|<br>Number|<br>MASKED WITH (FUNCTION = random(1, 100))|7102933|15|
 
 
@@ -71,7 +71,7 @@ The table pii\_masked\_columns keeps track of the masking pattern for each PII c
 - Schema\_name – Name of the schema where the source table is located
 - Table\_name – Name of the source table
 - Column\_name – Name of the pii column
-- Masking pattern – The pattern to obfuscate the data
+- Masking – The pattern to obfuscate the data
 
 
 
@@ -268,8 +268,6 @@ If you decide that you no longer need the setup presented in this post, make sur
 - For Actions, choose Delete.
 - Enter delete me in the box.
 - Choose Delete.
-# **Conclusion**
 
-In this post, we showed how you can implement dynamic data masking views in Aurora PostgreSQL-compatible Edition and RDS for PostgreSQL, by generating masking views to mask the PII data for unauthorized users. We also noted that Dynamic data masking is primarily for masking sensitive data on-the-fly in production environments for authorized users with limited access, but not for full data manipulation or development purposes. You can find the source code for the dynamic data masking artifacts on [AWS GitHub](https://github.com/aws-samples/Dynamic-data-masking-in-Amazon-RDS-for-PostgreSQL-Amazon-Aurora-PostgreSQL-and-Babelfish-for-Aurora). 
 
 
