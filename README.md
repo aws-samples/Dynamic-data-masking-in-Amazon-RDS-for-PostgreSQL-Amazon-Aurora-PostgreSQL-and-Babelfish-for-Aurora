@@ -232,7 +232,7 @@ Although dynamic data masking can often be simpler to get started with, it has s
 - **Inference vulnerabilities** – Although masking hides sensitive data, a user with access to masked data might still be able to infer sensitive information through pattern analysis
 
 ## **Clean up**
-If you no longer need the setup presented in this post, make sure to all the associated resources to avoid being charged in the future:
+If you no longer need the setup presented in this post, make sure to delete all the associated resources to avoid being charged in the future:
 
 1. On the Amazon RDS console, choose **Databases** in the navigation pane.
 1. Select the DB instance you want to delete, and on the **Actions** menu, choose **Delete**.
