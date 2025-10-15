@@ -1,3 +1,10 @@
+/* 
+1- First create database db1
+2- Create a sys schema in db1 database
+3- Load the DDM functions/procedure using PGDDM.sql
+4- Execute this create in the db1 database to populate the sample tables and sys.pii_unmasked_columns and sys.unmasked_roles.
+5- Run the DDM procedure to greate the masking views and test the generated views.
+*/
 DROP SCHEMA IF EXISTS view_schema CASCADE;
 CREATE SCHEMA view_schema;
 
@@ -9,7 +16,7 @@ CREATE TABLE source_schema.admin(name varchar(30),admin_id int, description varc
 CREATE TABLE source_schema.users(user_id int, user_name varchar(100));
 CREATE TABLE source_schema.user_location(location_id int, address varchar(100), user_id int);
 CREATE TABLE source_schema.user_ssn(ssn_id int, ssn varchar(100), user_id int);
-CREATE TABLE source_schema.user_job(job_id int, salary varchar(100), job varchar(100), title varchar(100), employee_id int, user_id int, email text);
+CREATE TABLE source_schema.user_job(job_id int, salary numeric(10,2), job varchar(100), title varchar(100), employee_id int, user_id int, email text, hire_date date);
 CREATE TABLE source_schema.user_bank(bank_id int, user_id int, bank_name text, account_id int, balance numeric(10,2));
 
 INSERT INTO source_schema.admin VALUES ('admin1', 1, 'labs');
@@ -62,91 +69,164 @@ INSERT INTO source_schema.user_ssn VALUES(6,  '345-745-9999',5);
 INSERT INTO source_schema.user_ssn VALUES(7,  '123-345-7777',6);
 SELECT * FROM source_schema.user_ssn;
 
-INSERT INTO source_schema.user_job VALUES(1, 300000, 'engineer','admin', 111111,1, 'john@efgh.biz');
-INSERT INTO source_schema.user_job VALUES(2, 400000, 'dba','manager', 44444,2, 'mary@amazon.com');
-INSERT INTO source_schema.user_job VALUES(3, 400000, 'writer','head writer', 76254,3, 'brad@aaaa.edu');
-INSERT INTO source_schema.user_job VALUES(4, 400000, 'architect','vp', 109294,4, 'joe@abcd.net');
-INSERT INTO source_schema.user_job VALUES(5, 400000, 'security','officer', 236514,5, 'joe@where-ur.net');
-INSERT INTO source_schema.user_job VALUES(6, 400000, 'account manager','sr manager', 1029394,6, 'joe@ggggg_uwu.org');
-INSERT INTO source_schema.user_job VALUES(7, 400000, 'customer rep ','customer liason', 524214,7, 'bill@abcd.gov');
+INSERT INTO source_schema.user_job VALUES(1, 300000, 'engineer','admin', 111111,1, 'john@efgh.biz', CURRENT_DATE);
+INSERT INTO source_schema.user_job VALUES(2, 400000, 'dba','manager', 44444,2, 'mary@amazon.com', CURRENT_DATE);
+INSERT INTO source_schema.user_job VALUES(3, 400000, 'writer','head writer', 76254,3, 'brad@aaaa.edu', CURRENT_DATE);
+INSERT INTO source_schema.user_job VALUES(4, 400000, 'architect','vp', 109294,4, 'joe@abcd.net', CURRENT_DATE);
+INSERT INTO source_schema.user_job VALUES(5, 400000, 'security','officer', 236514,5, 'joe@where-ur.net', CURRENT_DATE);
+INSERT INTO source_schema.user_job VALUES(6, 400000, 'account manager','sr manager', 1029394,6, 'joe@ggggg_uwu.org', CURRENT_DATE);
+INSERT INTO source_schema.user_job VALUES(7, 400000, 'customer rep ','customer liason', 524214,7, 'bill@abcd.gov', CURRENT_DATE);
 SELECT * FROM source_schema.user_job;
 
 --
 INSERT INTO sys.pii_masked_columns (database_name, schema_name, table_name, column_name, masking) 
-VALUES('users','source_schema','admin', 'name','MASKED WITH (FUNCTION = default())');
+VALUES('db1','source_schema','admin', 'name','MASKED WITH (FUNCTION = default(XXXXXXXX))');
 
 INSERT INTO sys.pii_masked_columns (database_name, schema_name, table_name, column_name, masking) 
-VALUES('users','source_schema','users', 'user_name','MASKED WITH (FUNCTION = default())');
+VALUES('db1','source_schema','users', 'user_name','MASKED WITH (FUNCTION = default(ZZZZZZZ))');
 
 INSERT INTO sys.pii_masked_columns (database_name, schema_name, table_name, column_name, masking) 
-VALUES('users','source_schema','user_job', 'salary','MASKED WITH (FUNCTION = default())');
+VALUES('db1','source_schema','user_job', 'salary','MASKED WITH (FUNCTION = default(0))');
 
 INSERT INTO sys.pii_masked_columns (database_name, schema_name, table_name, column_name, masking) 
-values('users','source_schema','user_job', 'title','MASKED WITH (FUNCTION = default())');
+values('db1','source_schema','user_job', 'hire_date','MASKED WITH (FUNCTION = default())');
 
 INSERT INTO sys.pii_masked_columns (database_name, schema_name, table_name, column_name, masking) 
-VALUES('users','source_schema','user_job', 'job','MASKED WITH (FUNCTION = default())');
+VALUES('db1','source_schema','user_job', 'job','MASKED WITH (FUNCTION = random(10))');
 
 INSERT INTO sys.pii_masked_columns (database_name, schema_name, table_name, column_name, masking) 
-VALUES('users','source_schema','user_job', 'email','MASKED WITH (FUNCTION = email())');
+VALUES('db1','source_schema','user_job', 'email','MASKED WITH (FUNCTION = email())');
 
 INSERT INTO sys.pii_masked_columns (database_name, schema_name, table_name, column_name, masking) 
-VALUES('users','source_schema','user_bank','bank_name','MASKED WITH (FUNCTION = partial(0,XXXXXXXX, 5))');
+VALUES('db1','source_schema','user_bank','bank_name','MASKED WITH (FUNCTION = partial(0,XXXXXXXX, 5))');
 
 INSERT INTO sys.pii_masked_columns (database_name, schema_name, table_name, column_name, masking) 
-VALUES('users','source_schema','user_bank','account_id','MASKED WITH (FUNCTION = random(1, 100))');
+VALUES('db1','source_schema','user_bank','account_id','MASKED WITH (FUNCTION = random(1, 100))');
 
 INSERT INTO sys.pii_masked_columns (database_name, schema_name, table_name, column_name, masking) 
-VALUES('users','source_schema','user_bank','balance','MASKED WITH (FUNCTION = random(100,500))');
+VALUES('db1','source_schema','user_bank','balance','MASKED WITH (FUNCTION = random(100,500))');
 
 INSERT INTO sys.pii_masked_columns (database_name, schema_name, table_name, column_name, masking) 
-VALUES('users','source_schema','user_ssn','ssn','MASKED WITH (FUNCTION = partial(0,XXXXXXXX, 5))');
+VALUES('db1','source_schema','user_ssn','ssn','MASKED WITH (FUNCTION = partial(0,XXXXXXXX, 5))');
 
 INSERT INTO sys.pii_masked_columns (database_name, schema_name, table_name, column_name, masking) 
-VALUES('users','source_schema','user_location','address','MASKED WITH (FUNCTION = partial(0,XXXXXXXX, 0))');
-
+VALUES('db1','source_schema','user_location','address','MASKED WITH (FUNCTION = partial(0,XXXXXXXX, 0))');
 
 
 INSERT INTO sys.unmasked_roles (role, database_name, schema_name, table_name) 
-VALUES('admin','users','source_schema','user_location');
+VALUES('admin','db1','source_schema','user_location');
 
 INSERT INTO sys.unmasked_roles (role, database_name, schema_name, table_name) 
-VALUES('admin','users','source_schema','job');
+VALUES('admin','db1','source_schema','jobs');
 
 INSERT INTO sys.unmasked_roles (role, database_name, schema_name, table_name) 
-VALUES('staff','users','source_schema','users');
+VALUES('admin','db1','source_schema','admin');
 
 INSERT INTO sys.unmasked_roles (role, database_name, schema_name, table_name) 
-VALUES('hr','users','source_schema','users');
+VALUES('staff','db1','source_schema','users');
 
 INSERT INTO sys.unmasked_roles (role, database_name, schema_name, table_name) 
-VALUES('postgres','users','source_schema','user_location');
+VALUES('hr','db1','source_schema','users');
 
 INSERT INTO sys.unmasked_roles (role, database_name, schema_name, table_name) 
-VALUES('hr','users','source_schema','user_job');
+VALUES('postgres','db1','source_schema','user_location');
 
 INSERT INTO sys.unmasked_roles (role, database_name, schema_name, table_name) 
-VALUES('hr','users','source_schema','user_bank');
+VALUES('hr','db1','source_schema','user_job');
 
 INSERT INTO sys.unmasked_roles (role, database_name, schema_name, table_name) 
-VALUES('hr','users','source_schema','user_location');
+VALUES('hr','db1','source_schema','user_bank');
+
+INSERT INTO sys.unmasked_roles (role, database_name, schema_name, table_name) 
+VALUES('hr','db1','source_schema','user_location');
 
 
 /*
  
-call sys.genmaskingview ('users','source_schema','user_bank','view_schema');
-call sys.MaskingReconciliation('users', 'source_schema','view_schema');
-CREATE ROLE hr;
-CREATE ROLE staff;
-CREATE ROLE admin;
-GRANT USAGE ON SCHEMA  view_schema TO hr, staff, admin;
-GRANT SELECT ON view_schema.user_bank to hr, staff, admin;
-GRANT SELECT ON view_schema.user_ssn to hr, staff, admin;
+CALL sys.genmaskingview ('db1','source_schema','user_job','view_schema');
+
+-- check table as role postgres
+SELECT * FROM view_schema.user_job;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'hr') THEN
+        CREATE ROLE hr;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'staff') THEN
+        CREATE ROLE staff;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'admin') THEN
+        CREATE ROLE admin;
+    END IF;
+END
+$$;
+
+GRANT USAGE ON SCHEMA  view_schema TO hr;
+GRANT USAGE ON SCHEMA  view_schema TO staff;
+GRANT USAGE ON SCHEMA  view_schema TO admin;
+
+GRANT SELECT ON view_schema.user_job to hr;
+GRANT SELECT ON view_schema.user_job to staff;
+GRANT SELECT ON view_schema.user_job to admin;
+
+-- Now try other roles -- defined in sys.unmaked_roles
 SET ROLE hr;
-SELECT * FROM view_schema.user_bank;
-SELECT * FROM view_schema.user_SSN;
+SELECT * FROM view_schema.user_job;
 SET ROLE staff;
+SELECT * FROM view_schema.user_job;
+SET ROLE admin;
+SELECT * FROM view_schema.user_job;
+
+SET ROLE postgres;
+CALL sys.MaskingReconciliation('db1', 'source_schema','view_schema');
+
+-- Note that there is no view on source_schema.jobs, because there is no entry for this table in sys.pii_masked_columns
+SELECT * FROM view_schema.user_location;
 SELECT * FROM view_schema.user_bank;
-SELECT * FROM view_schema.user_SSN;
+SELECT * FROM view_schema.user_ssn;
+SELECT * FROM view_schema.users;
+SELECT * FROM view_schema.admin;
+
+GRANT SELECT ON view_schema.user_location to hr;
+GRANT SELECT ON view_schema.user_location to staff;
+GRANT SELECT ON view_schema.user_location to admin;
+
+GRANT SELECT ON view_schema.user_ssn to hr;
+GRANT SELECT ON view_schema.user_ssn to staff;
+GRANT SELECT ON view_schema.user_ssn to admin;
+
+GRANT SELECT ON view_schema.user_bank to hr;
+GRANT SELECT ON view_schema.user_bank to staff;
+GRANT SELECT ON view_schema.user_bank to admin;
+
+GRANT SELECT ON view_schema.users to hr;
+GRANT SELECT ON view_schema.users to staff;
+GRANT SELECT ON view_schema.users to admin;
+
+GRANT SELECT ON view_schema.admin to hr;
+GRANT SELECT ON view_schema.admin to staff;
+GRANT SELECT ON view_schema.admin to admin;
+
+SET ROLE staff;
+SELECT * FROM view_schema.user_location;
+SELECT * FROM view_schema.user_bank;
+SELECT * FROM view_schema.user_ssn;
+SELECT * FROM view_schema.users;
+SELECT * FROM view_schema.admin;
+
+SET ROLE admin;
+SELECT * FROM view_schema.user_location;
+SELECT * FROM view_schema.user_bank;
+SELECT * FROM view_schema.user_ssn;
+SELECT * FROM view_schema.users;
+SELECT * FROM view_schema.admin;
+
+SET ROLE hr;
+SELECT * FROM view_schema.user_location;
+SELECT * FROM view_schema.user_bank;
+SELECT * FROM view_schema.user_ssn;
+SELECT * FROM view_schema.users;
+SELECT * FROM view_schema.admin;
 
 */
