@@ -1,3 +1,5 @@
+-- Author: Ezat Karimi
+--
 DROP SCHEMA IF EXISTS sys CASCADE;
 CREATE SCHEMA sys;
 
