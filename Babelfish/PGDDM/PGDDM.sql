@@ -72,11 +72,32 @@ DO $$
 $$
 LANGUAGE plpgsql;
 
+DO $$
+    BEGIN
+		IF EXISTS (SELECT * FROM pg_catalog.pg_tables
+			 WHERE schemaname = 'sys' AND tablename = 'unmasked_roles_effective')
+			 THEN
+				 BEGIN
+					DROP TABLE sys.unmasked_roles_effective CASCADE;
+				 END;
+		END IF;
+
+		CREATE TABLE IF NOT EXISTS sys.unmasked_roles_effective(
+			role TEXT,
+			granted_via TEXT,
+			database_name TEXT,
+			schema_name TEXT,
+			table_name TEXT,
+			PRIMARY KEY (role, database_name, schema_name, table_name));
+	END;
+$$
+LANGUAGE plpgsql;
+
 CREATE OR REPLACE FUNCTION sys.num(IN "@p_datatype" TEXT)
 				RETURNS SMALLINT 
 AS $$
 BEGIN
-		IF LOWER(@p_datatype) in ('int','int4','int8','bigint','decimal','numeric','money','fixeddecimal','float','float4','float8','tinyint','smallint')
+		IF LOWER(@p_datatype) in ('int','int4','int8','bigint','decimal','numeric','money','fixeddecimal','float','float4','float8','tinyint','smallint','bit')
 				 	RETURN 1;
       
 		RETURN 0;
@@ -141,6 +162,7 @@ BEGIN
 	    DECLARE @v_msg NVARCHAR(254);	
 	    DECLARE @v_table table(id int, val nvarchar(100));
 	    DECLARE @v_masked_string NVARCHAR(100);
+	    DECLARE @v_table_val NVARCHAR(100);
 
 		IF  @p_mask = '' RETURN  '';
 
@@ -171,7 +193,9 @@ BEGIN
   		SELECT @v_cnt = count(*) from @v_table;
   	
   		SELECT @v_func = val from @v_table WHERE id = 1;
+  		SELECT @v_table_val = val from @v_table WHERE id = 2;
   	
+  		/*
   		IF ((@v_func = 'default' OR @v_func = 'email') AND @v_cnt != 1 ) OR
 		    (@v_func = 'partial' AND @v_cnt != 4 ) OR
 		    (@v_func = 'random' AND @v_cnt != 3 )
@@ -179,19 +203,21 @@ BEGIN
 	  			SET @v_msg = FORMATMESSAGE('Invalid function format: %s', @v_mask);
 	  			THROW @v_err, @v_msg, 1;
 	  		END
+		*/
 	
 			IF(@v_func = 'default')
 			   BEGIN
-		  		 IF sys.num(@p_datatype) = 1 SET @v_func = 'default_num';	   					
-			  		ELSE IF sys.string(@p_datatype) = 1 SET @v_func = 'default_string';
-			  			  ELSE IF sys.dat(@p_datatype) = 1 SET @v_func = 'default_date';
-			  			   		 ELSE
-							  		BEGIN
-							  			 SET @v_msg = FORMATMESSAGE('Wrong Data Type for DDM function default: Column % with data type %.', @p_column, @p_datatype);
-						  			 	 THROW @v_err, @v_msg, 1;
-						  			END;
-						  		
-			    RETURN'sys.' + @v_func + '() ';
+			  		IF sys.string(@p_datatype) = 1
+						RETURN 'sys.default_string(' + '''' + @v_table_val + '''' + ') ';
+			  		ELSE IF sys.num(@p_datatype) = 1
+						RETURN 'sys.default_num(' + @v_table_val + ') ';
+			  		ELSE IF sys.dat(@p_datatype) = 1
+						RETURN 'sys.default_date() ';
+			  		ELSE
+						BEGIN
+							 SET @v_msg = FORMATMESSAGE('Wrong Data Type for DDM function default: Column %s with data type %s.', @p_column, @p_datatype);
+						 	 THROW @v_err, @v_msg, 1;
+						END;
 
 			   END
 
@@ -199,7 +225,7 @@ BEGIN
 		  BEGIN
 		  	IF sys.string(@p_datatype) != 1  
 				  		BEGIN
-				  			 SET @v_msg = FORMATMESSAGE('Wrong Data Type for DDM function email: Column % with data type %.', @p_column, @p_datatype);
+				  			 SET @v_msg = FORMATMESSAGE('Wrong Data Type for DDM function email: Column %s with data type %s.', @p_column, @p_datatype);
 			  			 	 THROW @v_err, @v_msg, 1;
 			  			END;		  		
 		   
@@ -208,23 +234,26 @@ BEGIN
 		
 		IF(@v_func = 'random')
 		  	BEGIN
-		  		IF sys.num(@p_datatype) = 1 SET @v_func = 'random_num';
+		  		IF sys.string(@p_datatype) = 1 SET @v_func = 'random_string';
+		  		ELSE IF sys.num(@p_datatype) = 1 SET @v_func = 'random_num';
 			  		ELSE 
 				  		BEGIN
-				  			 SET @v_msg = FORMATMESSAGE('Wrong Data Type for DDM function random: Column % with data type %.', p_column, p_datatype);
+				  			 SET @v_msg = FORMATMESSAGE('Wrong Data Type for DDM function random: Column %s with data type %s.', @p_column, @p_datatype);
 			  			 	 THROW @v_err, @v_msg, 1;
 			  			END;
 		  		
 		  		SELECT @v_start = val from @v_table WHERE id = 2;
 		  		SELECT @v_end = val from @v_table WHERE id = 3;
-		  		RETURN 'sys.' + @v_func + '(' + CAST(@v_start AS VARCHAR) + ',' + CAST(@v_end AS VARCHAR) + ') ';	
+		  		IF @v_func = 'random_string'
+		  			RETURN 'sys.' + @v_func + '(' + CAST(@v_start AS VARCHAR(20)) + ') ';
+		  		RETURN 'sys.' + @v_func + '(' + CAST(@v_start AS VARCHAR(20)) + ',' + CAST(@v_end AS VARCHAR(20)) + ') ';	
 		  	END;
 		
 		IF(@v_func = 'partial')
 		  	BEGIN
 		  		IF sys.string(@p_datatype) != 1 
 			  				BEGIN
-				  			 SET @v_msg = FORMATMESSAGE('Wrong Data Type for DDM function partial: Column % with data type %.', @p_column, @p_datatype);
+				  			 SET @v_msg = FORMATMESSAGE('Wrong Data Type for DDM function partial: Column %s with data type %s.', @p_column, @p_datatype);
 			  			 	 THROW @v_err, @v_msg, 1;
 			  			 	END
 		  		
@@ -232,23 +261,46 @@ BEGIN
 		  		SELECT @v_padding = val from @v_table WHERE id = 3;
 		  		SELECT @v_end = val from @v_table WHERE id = 4;	
 		  		
-		  		RETURN 'sys.' + @v_func + '(' + @p_column + ',' + CAST(@v_start AS VARCHAR) + ',' + '''' + @v_padding + '''' + ',' +  CAST(@v_end AS VARCHAR) + ')';	
+		  		RETURN 'sys.' + @v_func + '(' + @p_column + ',' + CAST(@v_start AS VARCHAR(20)) + ',' + '''' + @v_padding + '''' + ',' +  CAST(@v_end AS VARCHAR(20)) + ')';	
 		
 			END
 END;
 $function$
 ;
 
+/*
+ * email(@p_email TEXT) -> VARCHAR(776)
+ * Masks an email address by preserving the first character of the local part
+ * and the top-level domain, replacing everything in between with 'XXXXXXXX'.
+ * If the input is shorter than 4 characters, returns X's of the same length.
+ * Example: 'john@efgh.biz' -> 'jXXXXXXXX.biz'
+ */
 CREATE OR REPLACE FUNCTION sys.email(IN "@p_email" TEXT)
 RETURNS VARCHAR(776)
 AS $$
 BEGIN
-
-	    RETURN  REGEXP_REPLACE(@p_email COLLATE c, '([a-zA-Z0-9]{0,1})[a-zA-Z0-9_\-\.]+@([a-zA-Z0-9_\-]+\.)+(com|org|edu|nz|au|net|gov|biz)', '\1XXX@XXXXX.\3');
+		IF LENGTH(@p_email) < 4 RETURN SUBSTRING('XXXXXXXX', 1, LENGTH(@p_email));
+	    RETURN REGEXP_REPLACE(@p_email COLLATE c, '([a-zA-Z0-9]{0,1})[a-zA-Z0-9_\-\.]*@([a-zA-Z0-9_\-]+\.)+(com|org|edu|nz|au|net|gov|biz)', '\1XXXXXXXX.\3');
 END;
 $$
 LANGUAGE pltsql;
 
+/*
+ * partial(@p_column, @p_start, @p_padding, @p_end) -> VARCHAR(776)
+ * Partially masks a text value by exposing a prefix and suffix with padding in between.
+ * - @p_start (n): number of characters to expose from the start
+ * - @p_padding: the masking string inserted between prefix and suffix
+ * - @p_end (m): number of characters to expose from the end
+ *
+ * Behavior:
+ * - If input length <= padding length, or both start and end are 0: returns padding only
+ * - If start + end < (input length - padding length): adjusts start/end to split evenly
+ * - Otherwise: returns prefix + padding + suffix
+ *
+ * Examples:
+ *   partial('abcdefgh', 2, 'XXX', 3) -> 'abXXXfgh'
+ *   partial('hello', 1, '***', 1)     -> 'h***o'
+ */
 CREATE OR REPLACE FUNCTION sys.partial(IN "@p_column" TEXT, IN "@p_start" INT, IN "@p_padding" TEXT, IN "@p_end" INT)
 RETURNS VARCHAR(776)
 AS $$
@@ -267,50 +319,71 @@ END;
 $$
 LANGUAGE pltsql;
 
-CREATE OR REPLACE FUNCTION sys.default_string()
+/*
+ * default_string(@p_value TEXT) -> VARCHAR(776)
+ * Returns the provided constant string value. Used by the 'default' masking
+ * pattern for text columns.
+ * Example: default_string('XXXXXXXX') -> 'XXXXXXXX'
+ */
+CREATE OR REPLACE FUNCTION sys.default_string(IN "@p_value" TEXT)
 RETURNS VARCHAR(776)
 AS $$
 BEGIN  	
-	 
-	    RETURN 'X';
-	   
+	    RETURN @p_value;
 END;
 $$
 LANGUAGE pltsql;
 
-CREATE  OR REPLACE FUNCTION sys.default_num()
+/*
+ * default_num(@p_value INT) -> NUMERIC
+ * Returns the provided constant numeric value. Used by the 'default' masking
+ * pattern for numeric and bit columns.
+ * Example: default_num(0) -> 0
+ */
+CREATE  OR REPLACE FUNCTION sys.default_num(IN "@p_value" INT)
 RETURNS NUMERIC
 AS $$
 BEGIN  
-	
-	RETURN  0;
-	   
+	RETURN  @p_value;
 END;
 $$
 LANGUAGE pltsql;
 
 
+/*
+ * default_date() -> TIMESTAMP
+ * Returns the fixed timestamp '1900-01-01 00:00:00'. Used by the 'default'
+ * masking pattern for date, datetime, and time columns.
+ */
 CREATE  OR REPLACE FUNCTION sys.default_date()
-RETURNS VARCHAR(50)
+RETURNS TIMESTAMP WITHOUT TIME ZONE
 AS $$
 BEGIN  
-	
-	RETURN  '1900-01-01 00:00:00.00000000';
-	   
+	RETURN  '1900-01-01 00:00:00'::TIMESTAMP;
 END;
 $$
-LANGUAGE pltsql;
+LANGUAGE plpgsql;
 
 
-CREATE  OR REPLACE FUNCTION sys.random_string(IN "@p_column" TEXT)
+/*
+ * random_string(@p_length INT) -> VARCHAR(776)
+ * Generates a random alphanumeric string of the specified length using NEWID().
+ * Example: random_string(10) -> 'a8f2b4c1d9'
+ */
+CREATE  OR REPLACE FUNCTION sys.random_string(IN "@p_length" INT)
 RETURNS VARCHAR(776)
 AS $$
 BEGIN
-  RETURN REPEAT(STRING_AGG (SUBSTR('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', CEIL (RANDOM() * 62), 1), ''),LENGTH(@col));
+  RETURN SUBSTRING(REPLACE(CONVERT(VARCHAR(100), NEWID()), '-', ''), 1, @p_length);
 END;
 $$
 LANGUAGE pltsql;
 
+/*
+ * random_num(@p_low INT, @p_high INT) -> INT
+ * Generates a random integer between @p_low and @p_high, inclusive.
+ * Example: random_num(1, 100) -> 42
+ */
 CREATE  OR REPLACE FUNCTION sys.random_num(IN "@p_low" INT , IN "@p_high" INT) 
    RETURNS INT 
 AS $$
@@ -330,19 +403,19 @@ BEGIN
     DECLARE @v_view_schema NVARCHAR(100) = LOWER (@p_view_schema);
 	DECLARE @v_physical_source_schema  NVARCHAR(100) = @v_database + '_' + @v_source_schema;
     DECLARE @v_physical_view_schema    NVARCHAR(100) = @v_database + '_' + @v_view_schema;
-	DECLARE @v_masking NVARCHAR(776);
-    DECLARE @v_unmasked_roles NVARCHAR(776) = '';
-    DECLARE @v_unmasked_masked_columns NVARCHAR(776) = '';
-    DECLARE @v_unmasked_columns NVARCHAR(776) = '';
-    DECLARE @v_masked_columns NVARCHAR(776) = '';
-    DECLARE @v_sql_string NVARCHAR(776) = '';
+	DECLARE @v_masking NVARCHAR(MAX);
+    DECLARE @v_unmasked_roles NVARCHAR(MAX) = '';
+    DECLARE @v_unmasked_masked_columns NVARCHAR(MAX) = '';
+    DECLARE @v_unmasked_columns NVARCHAR(MAX) = '';
+    DECLARE @v_masked_columns NVARCHAR(MAX) = '';
+    DECLARE @v_sql_string NVARCHAR(MAX) = '';
 	DECLARE @v_column NVARCHAR(100);
-    DECLARE @v_columns NVARCHAR(776);
-    DECLARE @v_with_clause NVARCHAR(776);
-    DECLARE @v_mstring NVARCHAR(776);
+    DECLARE @v_columns NVARCHAR(MAX);
+    DECLARE @v_mstring NVARCHAR(MAX);
 	DECLARE @v_datatype NVARCHAR(100);
-	DECLARE @v_masked_string NVARCHAR(776);
-	DECLARE @v_msg NVARCHAR(776);
+	DECLARE @v_col_max_len INT;
+	DECLARE @v_masked_string NVARCHAR(MAX);
+	DECLARE @v_msg NVARCHAR(MAX);
 	DECLARE @v_err INT8 = 33557097;
    	DECLARE @v_out NVARCHAR(100);
     DECLARE @v_func NVARCHAR(100);
@@ -350,21 +423,26 @@ BEGIN
     DECLARE @v_padding NVARCHAR(100);
     DECLARE @v_start NVARCHAR(10);
     DECLARE @v_end NVARCHAR(10);
-    DECLARE @v_sql NVARCHAR(776);
-    DECLARE @v_dsql NVARCHAR(776);
+    DECLARE @v_sql NVARCHAR(MAX);
+    DECLARE @v_dsql NVARCHAR(MAX);
+    DECLARE @v_auth_check NVARCHAR(MAX);
+    DECLARE @v_grant_grantee NVARCHAR(100);
+    DECLARE @v_grant_privilege NVARCHAR(100);
+    DECLARE @v_grant_table table(grantee NVARCHAR(100), privilege_type NVARCHAR(100));
+    DECLARE @v_grantCursor CURSOR;
 
 	DECLARE @v_recCursor CURSOR FOR
-			WITH t AS (SELECT c.column_name, c.data_type  AS datatype 
+			WITH t AS (SELECT c.column_name, c.data_type  AS datatype, c.character_maximum_length AS col_max_len
 				      FROM  INFORMATION_SCHEMA.columns c
 				      WHERE LOWER(c.table_name) = @v_source_table
 				      AND   LOWER(c.table_schema) = @v_source_schema
 				      AND   LOWER(c.table_catalog) =  @v_database
 				     )
-			 SELECT t.column_name, t.datatype, masking FROM t INNER JOIN sys.pii_masked_columns m ON m.column_name = t.column_name 
+			 SELECT t.column_name, t.datatype, t.col_max_len, masking FROM t INNER JOIN sys.pii_masked_columns m ON LOWER(m.column_name) = LOWER(t.column_name) 
              WHERE LOWER(m.table_name) = @v_source_table AND LOWER(m.schema_name) = @v_source_schema and LOWER(m.database_name) = @v_database
                     UNION all
-             SELECT t.column_name, t.datatype,'' FROM t WHERE t.column_name NOT IN 
-            (SELECT column_name FROM sys.pii_masked_columns m WHERE LOWER(m.table_name) = @v_source_table AND LOWER(m.schema_name) = @v_source_schema and LOWER(m.database_name) = @v_database)
+             SELECT t.column_name, t.datatype, t.col_max_len, '' FROM t WHERE LOWER(t.column_name) NOT IN 
+            (SELECT LOWER(column_name) FROM sys.pii_masked_columns m WHERE LOWER(m.table_name) = @v_source_table AND LOWER(m.schema_name) = @v_source_schema and LOWER(m.database_name) = @v_database)
       		FOR READ ONLY;
 
 		IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE LOWER(name) = @v_database)
@@ -393,6 +471,13 @@ BEGIN
 				THROW @v_err, @v_msg, 1;
 	        END
 
+		IF NOT EXISTS (SELECT 1 FROM sys.pii_masked_columns WHERE LOWER(table_name) = @v_source_table AND LOWER(schema_name) = @v_source_schema AND LOWER(database_name) = @v_database)
+			BEGIN
+				SET @v_msg = FORMATMESSAGE('No masking columns defined for table %s.%s in database %s. No view generated.', @p_source_schema, @p_source_table, @p_database);
+				print @v_msg
+				RETURN;
+			END
+
 		IF  current_schema() NOT like @v_database + '%'
 			BEGIN
 	            SET @v_msg = FORMATMESSAGE('Current database is not %s.', @p_database);
@@ -400,8 +485,13 @@ BEGIN
 	        END
 	        
         OPEN @v_recCursor;
+
+		SET @v_auth_check = '(SELECT 1 FROM sys.unmasked_roles_effective WHERE table_name = ' + '''' + @v_source_table + '''' +
+			' AND schema_name = ' + '''' + @v_source_schema + '''' +
+			' AND database_name = ' + '''' + @v_database + '''' +
+			' AND role = ORIGINAL_LOGIN())';
 		
-		FETCH NEXT FROM @v_recCursor INTO @v_column,@v_datatype, @v_masking;
+		FETCH NEXT FROM @v_recCursor INTO @v_column, @v_datatype, @v_col_max_len, @v_masking;
 		WHILE @@FETCH_STATUS = 0
   			BEGIN
 
@@ -418,13 +508,17 @@ BEGIN
 		  			ELSE
 	                    BEGIN
 				  			SET @v_masked_string = sys.MaskingString(@v_masking, @v_column, @v_datatype);
-				  		    SET @v_mstring = ' CASE WHEN cnt = 1 THEN ' + @v_column + ' ELSE ' + @v_masked_string + ' END AS ' + @v_column;
+
+				  		    IF sys.string(@v_datatype) = 1
+				  		        SET @v_mstring = ' CASE WHEN ' + @v_auth_check + ' IS NOT NULL THEN CAST(' + @v_column + ' AS VARCHAR(776)) ELSE ' + @v_masked_string + ' END AS ' + @v_column;
+				  		    ELSE
+				  		        SET @v_mstring = ' CASE WHEN ' + @v_auth_check + ' IS NOT NULL THEN ' + @v_column + ' ELSE ' + @v_masked_string + ' END AS ' + @v_column;
 						 	IF @v_masked_columns = '' 
 					  			      SET @v_masked_columns = @v_mstring;
 					  			      ELSE SET @v_masked_columns = @v_masked_columns + ', ' + @v_mstring;
 	  	   				END
   			   
-  				FETCH NEXT FROM @v_recCursor INTO @v_column,@v_datatype, @v_masking;
+  				FETCH NEXT FROM @v_recCursor INTO @v_column, @v_datatype, @v_col_max_len, @v_masking;
   			END
   		
 		CLOSE @v_recCursor;
@@ -438,23 +532,56 @@ BEGIN
 			        	ELSE 
 						SET @v_columns = @v_unmasked_columns + ',' + @v_masked_columns
 
-		SET @v_with_clause = ' WITH t AS (SELECT COUNT(*) as cnt from sys.unmasked_roles ' +
-  	   					' WHERE table_name = ' + '''' + @v_source_table + '''' +
- 	   					' AND schema_name = ' + '''' + @v_source_schema + '''' +
-       					' AND database_name =' + '''' + @v_database + '''' +
-       					' AND role = ORIGINAL_LOGIN())';
-
-		SET @v_sql =  'CREATE VIEW ' + @p_view_schema + '.' + @p_source_table + ' AS ' + @v_with_clause + ' SELECT ' + @v_columns + ' FROM ' + @v_source_schema + '.' + @p_source_table + ', t';
+		SET @v_sql =  'CREATE VIEW ' + @p_view_schema + '.' + @p_source_table + ' AS SELECT ' + @v_columns + ' FROM ' + @v_source_schema + '.' + @p_source_table;
 ;
 	    IF (EXISTS (SELECT 1 from INFORMATION_SCHEMA.views
  						WHERE LOWER(table_schema) = @v_view_schema
  						AND   LOWER(table_name) = @v_source_table
  						AND   LOWER(table_catalog) = @v_database)) 
 	  		BEGIN
+				-- Save existing grants before dropping
+				-- Only include Babelfish logins (via sys.server_principals) to exclude internal roles
+				INSERT @v_grant_table
+				SELECT r.rolname AS grantee, p.privilege_type
+				FROM (
+					SELECT (aclexplode(c.relacl)).grantee AS grantee_oid,
+					       (aclexplode(c.relacl)).privilege_type AS privilege_type
+					FROM pg_catalog.pg_class c
+					JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+					WHERE n.nspname = @v_physical_view_schema
+					  AND c.relname = @v_source_table
+					  AND c.relacl IS NOT NULL
+				) p
+				JOIN pg_catalog.pg_roles r ON r.oid = p.grantee_oid
+				JOIN sys.server_principals sp ON sp.name = r.rolname;
+
 	            SET @v_dsql = 'DROP VIEW ' +  @v_view_schema + '.' + @v_source_table;
 				EXEC (@v_dsql);
 	        END
         EXEC (@v_sql);
+
+		-- Restore saved grants
+		SET @v_grantCursor = CURSOR FOR SELECT DISTINCT grantee, privilege_type FROM @v_grant_table;
+		OPEN @v_grantCursor;
+		FETCH NEXT FROM @v_grantCursor INTO @v_grant_grantee, @v_grant_privilege;
+		WHILE @@FETCH_STATUS = 0
+			BEGIN
+				IF EXISTS (SELECT 1 FROM sys.server_principals WHERE name = @v_grant_grantee)
+					BEGIN
+						SET @v_dsql = 'GRANT ' + @v_grant_privilege + ' ON ' + @p_view_schema + '.' + @p_source_table + ' TO ' + @v_grant_grantee;
+						EXEC (@v_dsql);
+						SET @v_msg = FORMATMESSAGE('Restored %s on %s.%s to %s', @v_grant_privilege, @p_view_schema, @p_source_table, @v_grant_grantee);
+						print @v_msg
+					END
+				ELSE
+					BEGIN
+						SET @v_msg = FORMATMESSAGE('Skipping grant restore: role %s no longer exists', @v_grant_grantee);
+						print @v_msg
+					END
+				FETCH NEXT FROM @v_grantCursor INTO @v_grant_grantee, @v_grant_privilege;
+			END
+		CLOSE @v_grantCursor;
+		DEALLOCATE @v_grantCursor;
 END;
 $procedure$
 ;
@@ -471,7 +598,7 @@ BEGIN
 		DECLARE  @v_ds  sys.NVARCHAR(200) = LOWER(@p_database + '_' + @p_source_schema);
 		DECLARE  @v_ret INT = 0;
 	    DECLARE  @v_err INT = 33557097;
-		DECLARE  @v_recCursor CURSOR FOR SELECT TABLENAME FROM PG_TABLES WHERE SCHEMANAME = @v_ds;
+		DECLARE  @v_recCursor CURSOR FOR SELECT DISTINCT table_name FROM sys.pii_masked_columns WHERE LOWER(database_name) = LOWER(@p_database) AND LOWER(schema_name) = LOWER(@p_source_schema);
 	
 	  	IF NOT EXISTS (SELECT * FROM pg_catalog.pg_namespace WHERE LOWER(nspname) = @v_vs)
 	  		BEGIN
@@ -481,7 +608,7 @@ BEGIN
 	  		
 	  	IF NOT EXISTS (SELECT * FROM PG_TABLES WHERE LOWER(schemaname) = @v_ds)
 	  		BEGIN
-	  			SET @v_msg = FORMATMESSAGE('Schema %s does not exist.', @v_ds);	 
+	  			SET @v_msg = FORMATMESSAGE('Source schema %s does not exist.', @v_ds);	 
            		THROW @v_err, @v_msg, 1;
 	  		END
 	  		
@@ -494,16 +621,24 @@ BEGIN
 				    SET @v_msg = FORMATMESSAGE('maskingReconciliation:Processing %s %s ', @v_ds, @v_table);
 					print @v_msg
 
-				    EXEC @v_ret = sys.genmaskingview @p_database, @p_source_schema, @v_table, @p_view_schema;
-					
-					IF @v_ret = -1 
-						BEGIN
-							SET @v_msg = FORMATMESSAGE('maskingReconciliation:Failed to process %s %s', @v_ds, @v_table);	 
-           				    THROW @v_err, @v_msg, 1;
-						END
-						
-				   	SET @v_msg = FORMATMESSAGE('maskingReconciliation:Processed %s.%s ', @v_ds, @v_table);
-					print @v_msg
+					BEGIN TRY
+					    EXEC @v_ret = sys.genmaskingview @p_database, @p_source_schema, @v_table, @p_view_schema;
+
+						IF @v_ret = -1
+							BEGIN
+								SET @v_msg = FORMATMESSAGE('maskingReconciliation:Failed to generate view for %s.%s (return code -1)', @v_ds, @v_table);
+								print @v_msg
+							END
+						ELSE
+							BEGIN
+								SET @v_msg = FORMATMESSAGE('maskingReconciliation:Processed %s.%s ', @v_ds, @v_table);
+								print @v_msg
+							END
+					END TRY
+					BEGIN CATCH
+						SET @v_msg = FORMATMESSAGE('maskingReconciliation:ERROR generating view for %s.%s - %s', @v_ds, @v_table, ERROR_MESSAGE());
+						print @v_msg
+					END CATCH
 	  			
 					FETCH NEXT FROM @v_recCursor INTO @v_table;
 				   
@@ -515,7 +650,121 @@ END;
 $$
 LANGUAGE pltsql;
 
+CREATE OR REPLACE PROCEDURE sys.RefreshEffectiveRoles(
+	p_database TEXT,
+	p_schema TEXT,
+	p_table TEXT
+)
+AS $$
+BEGIN
+	DELETE FROM sys.unmasked_roles_effective
+	WHERE database_name = p_database
+	  AND schema_name = p_schema
+	  AND table_name = p_table;
+
+	INSERT INTO sys.unmasked_roles_effective (role, granted_via, database_name, schema_name, table_name)
+	SELECT ur.role, ur.role, ur.database_name, ur.schema_name, ur.table_name
+	FROM sys.unmasked_roles ur
+	WHERE ur.database_name = p_database
+	  AND ur.schema_name = p_schema
+	  AND ur.table_name = p_table;
+
+	INSERT INTO sys.unmasked_roles_effective (role, granted_via, database_name, schema_name, table_name)
+	SELECT m.rolname, ur.role, ur.database_name, ur.schema_name, ur.table_name
+	FROM sys.unmasked_roles ur
+	JOIN pg_roles r ON r.rolname = ur.role
+	JOIN pg_auth_members am ON am.roleid = r.oid
+	JOIN pg_roles m ON m.oid = am.member
+	WHERE ur.database_name = p_database
+	  AND ur.schema_name = p_schema
+	  AND ur.table_name = p_table
+	  AND NOT EXISTS (
+		SELECT 1 FROM sys.unmasked_roles_effective e
+		WHERE e.role = m.rolname
+		  AND e.database_name = p_database
+		  AND e.schema_name = p_schema
+		  AND e.table_name = p_table
+	  );
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE OR REPLACE PROCEDURE sys.RefreshEffectiveRoles(
+	p_database TEXT,
+	p_schema TEXT
+)
+AS $$
+DECLARE
+	v_table TEXT;
+	v_cursor CURSOR FOR
+		SELECT DISTINCT table_name
+		FROM (
+			SELECT table_name FROM sys.unmasked_roles
+			WHERE database_name = p_database AND schema_name = p_schema
+			UNION
+			SELECT table_name FROM sys.unmasked_roles_effective
+			WHERE database_name = p_database AND schema_name = p_schema
+		) t;
+BEGIN
+	OPEN v_cursor;
+	LOOP
+		FETCH NEXT FROM v_cursor INTO v_table;
+		EXIT WHEN NOT FOUND;
+		CALL sys.RefreshEffectiveRoles(p_database, p_schema, v_table);
+	END LOOP;
+	CLOSE v_cursor;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE OR REPLACE PROCEDURE sys.unmask_role(IN "@p_database" TEXT, IN "@p_source_schema" TEXT, IN "@p_table" TEXT, IN "@p_role" TEXT)
+AS $$
+BEGIN
+	DECLARE @v_err INT = 33557097;
+	DECLARE @v_msg NVARCHAR(254);
+
+	IF EXISTS (SELECT * FROM sys.unmasked_roles
+				WHERE database_name = @p_database
+				  AND schema_name = @p_source_schema
+				  AND table_name = @p_table
+				  AND role = @p_role)
+		BEGIN
+			SET @v_msg = FORMATMESSAGE('Row with role %s, database %s, schema %s, table %s already exists in sys.unmasked_roles', @p_role, @p_database, @p_source_schema, @p_table);
+			THROW @v_err, @v_msg, 1;
+		END
+
+	INSERT INTO sys.unmasked_roles(role, database_name, schema_name, table_name)
+	VALUES(@p_role, @p_database, @p_source_schema, @p_table);
+END;
+$$
+LANGUAGE pltsql;
+
+CREATE OR REPLACE PROCEDURE sys.mask_role(IN "@p_database" TEXT, IN "@p_source_schema" TEXT, IN "@p_table" TEXT, IN "@p_role" TEXT)
+AS $$
+BEGIN
+	DECLARE @v_err INT = 33557097;
+	DECLARE @v_msg NVARCHAR(254);
+
+	IF NOT EXISTS (SELECT * FROM sys.unmasked_roles
+					WHERE database_name = @p_database
+					  AND schema_name = @p_source_schema
+					  AND table_name = @p_table
+					  AND role = @p_role)
+		BEGIN
+			SET @v_msg = FORMATMESSAGE('Row with role %s, database %s, schema %s, table %s does not exist in sys.unmasked_roles', @p_role, @p_database, @p_source_schema, @p_table);
+			THROW @v_err, @v_msg, 1;
+		END
+
+	DELETE FROM sys.unmasked_roles
+	WHERE database_name = @p_database
+	  AND schema_name = @p_source_schema
+	  AND table_name = @p_table
+	  AND role = @p_role;
+END;
+$$
+LANGUAGE pltsql;
+
 GRANT SELECT, UPDATE, DELETE, INSERT ON sys.pii_masked_columns TO PUBLIC;
 GRANT SELECT, UPDATE, DELETE, INSERT ON sys.unmasked_roles TO PUBLIC;
-
+GRANT SELECT, UPDATE, DELETE, INSERT ON sys.unmasked_roles_effective TO PUBLIC;
 
