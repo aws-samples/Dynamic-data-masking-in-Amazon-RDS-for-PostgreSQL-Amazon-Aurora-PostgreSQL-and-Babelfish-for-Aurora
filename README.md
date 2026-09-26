@@ -1,7 +1,7 @@
 ﻿# **Dynamic data masking in Amazon RDS for PostgreSQL, Amazon Aurora PostgreSQL, and Babelfish for Aurora PostgreSQL**
 Data obfuscation, or data anonymization, refers to a collection of techniques used to disguise or alter sensitive data to minimize the risk of data breaches, while still allowing legitimate access for necessary operations. This process is commonly used in industries such as financial, healthcare, and government industries, where confidentiality of sensitive information is important and demanded by industry compliance standards and regulations. 
 
-Data obfuscation techniques can vary in the level of privacy protection they offer. These techniques include:
+**Data obfuscation techniques** can vary in the level of privacy protection they offer. These techniques include:
 
 - **Encryption** – [This technique](https://en.wikipedia.org/wiki/Encryption) converts data into a coded language using a mathematical algorithm, which can only be deciphered with a specific key. 
 - **Hashing** – [This technique](https://en.wikipedia.org/wiki/Salt_\(cryptography\)) uses unique SALTs fed to one-way hash functions to convert data into a fixed-length code that is irreversible, making it impossible to reverse engineer the original data. 
